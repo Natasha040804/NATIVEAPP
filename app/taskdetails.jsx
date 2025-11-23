@@ -8,12 +8,14 @@ import {
   Alert,
   ActivityIndicator 
 } from 'react-native';
+import { Linking } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
 import useParsedLocalSearchParams from '../lib/params';
 import Sidebar from '../components/Sidebar';
-import { api } from '../lib/api';
+import { api, diagnoseConnectivity, API_BASE_URL } from '../lib/api';
+import { useNetworkStatus, getOfflineReason } from '../hooks/useNetworkStatus';
 import { useLocationTracking } from '../hooks/useLocationTracking';
 
 export default function TaskDetails() {
@@ -22,7 +24,11 @@ export default function TaskDetails() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [assignment, setAssignment] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [netDiag, setNetDiag] = useState(null);
+  const [assignError, setAssignError] = useState(null);
   const { id } = useParsedLocalSearchParams();
+  const netStatus = useNetworkStatus();
+  const offlineReason = getOfflineReason(netStatus);
 
   // Start location tracking when this task is active
   const trackingActive = useMemo(() => {
@@ -39,13 +45,28 @@ export default function TaskDetails() {
     try {
       const assignmentData = await api.getDeliveryAssignment(id);
       setAssignment(assignmentData);
+      setAssignError(null);
     } catch (error) {
       console.error('Failed to load assignment details:', error);
-      Alert.alert('Error', 'Failed to load assignment details');
+      setAssignError(error?.message || String(error));
     } finally {
       setLoading(false);
     }
   };
+
+  // Run network diagnostics if assignment fails or on initial mount
+  useEffect(() => {
+    if (!netDiag) {
+      (async () => {
+        try {
+          const diag = await diagnoseConnectivity();
+          setNetDiag(diag);
+        } catch (e) {
+          setNetDiag({ base: API_BASE_URL, results: [{ url: 'diagnostic', ok: false, error: e?.message || String(e) }] });
+        }
+      })();
+    }
+  }, [netDiag]);
 
   const updateStatus = async (newStatus) => {
     try {
@@ -84,6 +105,42 @@ export default function TaskDetails() {
 
   const getLocationTypeLabel = (type) => {
     return type === 'BRANCH' ? 'Branch' : 'Office';
+  };
+
+  const openDirections = () => {
+    if (!assignment) return;
+    const fromLat = assignment.from_branch_lat;
+    const fromLng = assignment.from_branch_lng;
+    const toLat = assignment.to_branch_lat;
+    const toLng = assignment.to_branch_lng;
+
+    // Prefer lat/lng; fallback to branch names/addresses
+    let origin;
+    let destination;
+    if (fromLat != null && fromLng != null) {
+      origin = `${fromLat},${fromLng}`;
+    } else if (assignment.from_branch_address) {
+      origin = encodeURIComponent(assignment.from_branch_address);
+    } else if (assignment.from_branch_name) {
+      origin = encodeURIComponent(assignment.from_branch_name);
+    }
+    if (toLat != null && toLng != null) {
+      destination = `${toLat},${toLng}`;
+    } else if (assignment.to_branch_address) {
+      destination = encodeURIComponent(assignment.to_branch_address);
+    } else if (assignment.to_branch_name) {
+      destination = encodeURIComponent(assignment.to_branch_name);
+    }
+
+    if (!origin || !destination) {
+      Alert.alert('Directions Unavailable', 'Missing branch coordinates or addresses.');
+      return;
+    }
+
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'Failed to open Google Maps');
+    });
   };
 
   if (loading) {
@@ -126,6 +183,49 @@ export default function TaskDetails() {
         </View>
 
         <View style={styles.card}>
+          {offlineReason && (
+            <View style={styles.offlineBanner}>
+              <Text style={styles.offlineTitle}>Offline Detected</Text>
+              <Text style={styles.offlineText}>{offlineReason}</Text>
+              <Text style={styles.offlineHint}>Checks:
+              {'\n'}• Enable Wi‑Fi or cellular data
+              {'\n'}• Disable airplane mode / VPN
+              {'\n'}• Open a website to confirm internet
+              {'\n'}• If captive portal, complete login</Text>
+            </View>
+          )}
+          {assignError && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerTitle}>Connection / Data Error</Text>
+              <Text style={styles.errorBannerText}>{assignError}</Text>
+              {netDiag && (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={styles.errorBannerSub}>Diagnostics (base: {netDiag.base}):</Text>
+                  {netDiag.results.map((r, i) => (
+                    <Text key={i} style={styles.errorBannerLine}>
+                      {r.ok ? '✅' : '❌'} {r.url} {r.status ? `(status ${r.status})` : ''} {r.ms != null ? `${r.ms}ms` : ''} {r.error ? '- ' + r.error : ''}
+                    </Text>
+                  ))}
+                  {netDiag.external && (
+                    <Text style={styles.errorBannerLine}>
+                      {netDiag.external.ok ? '✅' : '❌'} External reachability {netDiag.external.status ? `(status ${netDiag.external.status})` : ''} {netDiag.external.ms != null ? `${netDiag.external.ms}ms` : ''} {netDiag.external.error ? '- ' + netDiag.external.error : ''}
+                    </Text>
+                  )}
+                  {netDiag.classification && (
+                    <View style={{ marginTop: 6 }}>
+                      <Text style={styles.errorBannerSub}>Classification: {netDiag.classification.code}</Text>
+                      {netDiag.classification.suggestions.map((s, idx) => (
+                        <Text key={idx} style={styles.errorBannerLine}>• {s}</Text>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+              <TouchableOpacity style={styles.retryBtn} onPress={() => { setLoading(true); loadAssignmentDetails(); }}>
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <Text style={styles.sectionTitle}>Assignment Information</Text>
           {/* Lightweight indicator for tracking state */}
           {trackingActive && (
@@ -264,7 +364,7 @@ export default function TaskDetails() {
             <Text style={styles.mapSubtext}>
               {assignment.from_branch_name} to {assignment.to_branch_name}
             </Text>
-            <TouchableOpacity style={styles.directionsBtn}>
+            <TouchableOpacity style={styles.directionsBtn} onPress={openDirections}>
               <Icon name="directions" size={18} color="#fff" />
               <Text style={styles.directionsText}>Get Directions</Text>
             </TouchableOpacity>
@@ -343,6 +443,69 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+  },
+  errorBanner: {
+    backgroundColor: '#fff4f4',
+    borderColor: '#dc2626',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  errorBannerTitle: {
+    color: '#b91c1c',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  errorBannerText: {
+    color: '#991b1b',
+    fontSize: 12,
+  },
+  errorBannerSub: {
+    color: '#7f1d1d',
+    fontSize: 11,
+    marginBottom: 2,
+    fontWeight: '600',
+  },
+  errorBannerLine: {
+    fontSize: 11,
+    color: '#7f1d1d',
+  },
+  offlineBanner: {
+    backgroundColor: '#f0f9ff',
+    borderColor: '#0ea5e9',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  offlineTitle: {
+    color: '#0369a1',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  offlineText: {
+    color: '#075985',
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  offlineHint: {
+    color: '#0c4a6e',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  retryBtn: {
+    marginTop: 10,
+    backgroundColor: '#dc2626',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  retryText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
   },
   sectionTitle: {
     fontSize: 16,

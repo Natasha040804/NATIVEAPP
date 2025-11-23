@@ -22,16 +22,19 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.yatogod.LogisticsApp"
+      "package": "com.yatogod.LogisticsApp",
+      "usesCleartextTraffic": true,
+      "networkSecurityConfig": "./android/app/src/main/res/xml/network_security_config.xml"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "./plugins/networkSecurityConfig"
     ],
     "extra": {
-      "EXPO_PUBLIC_API_BASE": "http://16.176.194.83:5000/api",
+      "EXPO_PUBLIC_API_BASE": "http://16.176.194.83/api",
       "router": {},
       "eas": {
         "projectId": "d445abce-59b0-4465-b483-d679a6aca96d"
