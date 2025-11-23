@@ -1,0 +1,145 @@
+/* Dashboard styles matching provided mockup */
+:root{
+  --bg: #e9c6f0; /* light lavender page background */
+  --pill: #7a4be6; /* purple pill */
+  --btn: #ffb347; /* orange buttons */
+  --icon: #000; /* black icons */
+}
+
+.dashboard-root{
+  min-height:100vh;
+  background:var(--bg);
+  display:flex;
+  flex-direction:column;
+}
+
+.top-pill{
+  margin:18px 16px 8px;
+  background:var(--pill);
+  border-radius:28px;
+  padding:12px 16px;
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:flex-start;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.icon-btn{
+  width:54px;
+  height:54px;
+  background:var(--btn);
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+}
+
+/* Simple CSS icons built with pseudo-elements and borders */
+.icon{
+  width:28px;
+  height:28px;
+  position:relative;
+}
+
+.icon.home:before{
+  content:'';
+  position:absolute;
+  left:50%;
+  top:18%;
+  transform:translateX(-50%);
+  width:0;
+  height:0;
+  border-left:10px solid transparent;
+  border-right:10px solid transparent;
+  border-bottom:10px solid var(--icon);
+}
+.icon.home:after{
+  content:'';
+  position:absolute;
+  left:50%;
+  top:34%;
+  transform:translateX(-50%);
+  width:18px;
+  height:12px;
+  background:var(--icon);
+}
+
+.icon.clipboard:before{
+  content:'';
+  position:absolute;
+  left:50%;
+  top:6%;
+  transform:translateX(-50%);
+  width:12px;
+  height:6px;
+  background:var(--icon);
+  border-radius:2px;
+}
+.icon.clipboard:after{
+  content:'';
+  position:absolute;
+  left:50%;
+  top:30%;
+  transform:translateX(-50%);
+  width:18px;
+  height:22px;
+  background:var(--icon);
+  border-radius:2px;
+}
+
+.icon.map:before{
+  content:'';
+  position:absolute;
+  left:30%;
+  top:14%;
+  width:4px;
+  height:14px;
+  background:var(--icon);
+  transform:skewX(-12deg);
+}
+.icon.map:after{
+  content:'';
+  position:absolute;
+  right:22%;
+  top:10%;
+  width:8px;
+  height:20px;
+  border:3px solid var(--icon);
+  border-radius:50% 50% 40% 40%/60% 60% 40% 40%;
+}
+
+.icon.menu:before,
+.icon.menu:after,
+.icon.menu .mid{
+  content:'';
+}
+.icon.menu:before{
+  content:'';
+  position:absolute;
+  left:30%;
+  top:22%;
+  width:12px;
+  height:2px;
+  background:var(--icon);
+}
+.icon.menu:after{
+  content:'';
+  position:absolute;
+  left:30%;
+  top:46%;
+  width:12px;
+  height:2px;
+  background:var(--icon);
+}
+
+.dashboard-main{
+  flex:1;
+}
+
+/* responsive: keep top pill centered on small widths */
+@media (max-width:420px){
+  .top-pill{ margin:12px; }
+  .icon-btn{ width:48px; height:48px; }
+}
