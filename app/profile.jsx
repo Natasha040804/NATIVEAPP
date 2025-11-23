@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Sidebar from '../components/Sidebar';
 import { api } from '../lib/api';
+import defaultAvatar from '../assets/icon.png';
 
 export default function Profile() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -58,8 +59,6 @@ export default function Profile() {
     }
   };
 
-  const getDefaultPhoto = () => require('../assets/ronron.jpg');
-
   const getProfilePhotoUrl = (photoPath) => {
     if (!photoPath) return null;
     if (photoPath.startsWith('http')) return photoPath;
@@ -73,6 +72,8 @@ export default function Profile() {
       return photoPath;
     }
   };
+
+  const getDefaultPhoto = () => defaultAvatar;
 
   if (loading) {
     return (

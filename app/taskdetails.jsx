@@ -35,7 +35,7 @@ export default function TaskDetails() {
     const s = String(assignment?.status || '').toUpperCase();
     return s === 'ASSIGNED' || s === 'IN_PROGRESS';
   }, [assignment]);
-  const { isTracking, locationError } = useLocationTracking(id, trackingActive);
+  const { isTracking, locationError, location } = useLocationTracking(id, trackingActive);
 
   useEffect(() => {
     loadAssignmentDetails();
@@ -107,32 +107,49 @@ export default function TaskDetails() {
     return type === 'BRANCH' ? 'Branch' : 'Office';
   };
 
+  const resolveBranchTarget = (prefix) => {
+    const lat = assignment?.[`${prefix}_branch_lat`];
+    const lng = assignment?.[`${prefix}_branch_lng`];
+    if (lat != null && lng != null) return `${lat},${lng}`;
+    const address = assignment?.[`${prefix}_branch_address`];
+    if (address) return encodeURIComponent(address);
+    const name = assignment?.[`${prefix}_branch_name`];
+    if (name) return encodeURIComponent(name);
+    return null;
+  };
+
   const openDirections = () => {
     if (!assignment) return;
-    const fromLat = assignment.from_branch_lat;
-    const fromLng = assignment.from_branch_lng;
-    const toLat = assignment.to_branch_lat;
-    const toLng = assignment.to_branch_lng;
+    const status = String(assignment.status || '').toUpperCase();
+    const currentCoords = (location?.latitude != null && location?.longitude != null)
+      ? `${location.latitude},${location.longitude}`
+      : null;
 
-    // Prefer lat/lng; fallback to branch names/addresses
-    let origin;
-    let destination;
-    if (fromLat != null && fromLng != null) {
-      origin = `${fromLat},${fromLng}`;
-    } else if (assignment.from_branch_address) {
-      origin = encodeURIComponent(assignment.from_branch_address);
-    } else if (assignment.from_branch_name) {
-      origin = encodeURIComponent(assignment.from_branch_name);
-    }
-    if (toLat != null && toLng != null) {
-      destination = `${toLat},${toLng}`;
-    } else if (assignment.to_branch_address) {
-      destination = encodeURIComponent(assignment.to_branch_address);
-    } else if (assignment.to_branch_name) {
-      destination = encodeURIComponent(assignment.to_branch_name);
+    const fromTarget = resolveBranchTarget('from');
+    const toTarget = resolveBranchTarget('to');
+
+    let origin = null;
+    let destination = null;
+
+    if ((status === 'ASSIGNED' || status === 'IN_PROGRESS') && currentCoords) {
+      origin = currentCoords;
+    } else if (status !== 'ASSIGNED' && status !== 'IN_PROGRESS') {
+      origin = fromTarget;
     }
 
-    if (!origin || !destination) {
+    if (status === 'ASSIGNED') {
+      destination = fromTarget;
+    } else if (status === 'IN_PROGRESS') {
+      destination = toTarget;
+    } else {
+      destination = toTarget;
+    }
+
+    if (!origin) {
+      Alert.alert('Directions Unavailable', 'Current location is unavailable. Please allow location access and try again.');
+      return;
+    }
+    if (!destination) {
       Alert.alert('Directions Unavailable', 'Missing branch coordinates or addresses.');
       return;
     }
